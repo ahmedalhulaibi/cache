@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package cache.v1;
+
+import "google/api/annotations.proto";
+
+service CacheService {
+  // Set insert or update a key-value pair in the cache.
+  rpc Set (SetRequest) returns (SetResponse) {
+    option (google.api.http) = {
+      post: "/v1/set"
+      body: "*"
+    };
+  };
+
+  // Get retrieves a value from the cache.
+  rpc Get (GetRequest) returns (GetResponse) {
+    option (google.api.http) = {
+      get: "/v1/get/{bucket}/{key}"
+    };
+  };
+}
+
+message SetRequest {
+  string bucket = 1;
+  string key = 2;
+  string value = 3;
+  // ttl in seconds, use 0 or <0 for no expiration
+  int32 ttl = 4;
+}
+
+message SetResponse {
+  string message = 1;
+}
+
+message GetRequest {
+  string bucket = 1;
+  string key = 2;
+}
+
+message GetResponse {
+  string value = 1;
+}
