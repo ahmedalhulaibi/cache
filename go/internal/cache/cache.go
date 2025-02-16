@@ -1,6 +1,10 @@
 package cache
 
-import "time"
+import (
+	"container/list"
+	"sync"
+	"time"
+)
 
 /*
 ### Create an in-memory cache that can hold a maximum of 255 keys and satisfies the interface given below.
@@ -43,3 +47,36 @@ type Options struct {
 }
 
 type Option func(*Options) error
+
+func WithTTL(ttl time.Duration) Option {
+	return func(o *Options) error {
+		o.ttl = ttl
+		return nil
+	}
+}
+
+func WithEvictionPolicy(policy EvictionPolicy) Option {
+	return func(o *Options) error {
+		o.evictionPolicy = policy
+		return nil
+	}
+}
+
+/*
+Assumptions:
+1. The 255 keys limit is for each bucket
+*/
+
+type bucket struct {
+	buckets map[string]*cache
+	sync.RWMutex
+}
+
+type cache struct {
+	recentlyUsed list.List // front is most recently used
+	age          list.List // front is oldest
+	keys         map[string]int
+	data         [][]byte
+	capacity     uint
+	sync.RWMutex
+}
