@@ -2,6 +2,7 @@ package cache
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -72,6 +73,31 @@ func TestMruEviction(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []byte("user1"), record)
 	require.NoError(t, c.Set("user:3", []byte("user3"), defaultOpts))
+	record, err = c.Get("user:1", defaultOpts)
+	require.NoError(t, err)
+	require.Nil(t, record)
+}
+
+func TestTtlExpiry(t *testing.T) {
+	c := newCache(1)
+	defaultOpts, _ := getOptions()
+	defaultOpts.evictOnGet = false
+	defaultOpts.ttl = time.Second
+
+	now, err := time.Parse(time.RFC3339, "2021-01-01T00:00:00Z")
+	require.NoError(t, err)
+	defaultOpts.clock = func() time.Time {
+		return now
+	}
+
+	require.NoError(t, c.Set("user:1", []byte("user1"), defaultOpts))
+	record, err := c.Get("user:1", defaultOpts)
+	require.NoError(t, err)
+	require.Equal(t, []byte("user1"), record)
+
+	defaultOpts.clock = func() time.Time {
+		return now.Add(2 * time.Second)
+	}
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
