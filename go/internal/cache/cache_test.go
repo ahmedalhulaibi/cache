@@ -1,11 +1,32 @@
 package cache
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/require"
 )
+
+func TestBucket(t *testing.T) {
+	b := NewCache()
+	require.NotNil(t, b)
+
+	require.NoError(t, b.Set("bucket1", "key1", []byte("value1")))
+	record, err := b.Get("bucket1", "key1")
+	require.NoError(t, err)
+	require.Equal(t, []byte("value1"), record)
+
+	for i := 0; i < 1000; i++ {
+		require.NoError(t, b.Set("bucket1", fmt.Sprintf("r%d", i), []byte("value1"), WithTTL(0*time.Second), WithEvictionPolicy(EvictLRU)))
+		if i%255 == 0 {
+			r, err := b.Get("bucket1", fmt.Sprintf("r%d", i-255))
+			require.NoError(t, err)
+			require.Nil(t, r)
+		}
+	}
+
+}
 
 func TestCacheImplementationGet(t *testing.T) {
 	c := newCache(1)
@@ -24,9 +45,6 @@ func TestCacheImplementationGet(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Equal(t, []byte("user1"), record)
-
-	// size of cache should be 1
-	require.Equal(t, 1, len(c.ruIndex))
 }
 
 func TestLruEviction(t *testing.T) {
@@ -45,8 +63,6 @@ func TestLruEviction(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
-
-	require.Equal(t, 1, len(c.ruIndex))
 }
 
 func TestLruEvictionIncreasedCapacity(t *testing.T) {
@@ -64,8 +80,6 @@ func TestLruEvictionIncreasedCapacity(t *testing.T) {
 	record, err = c.Get("user:2", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
-
-	require.Equal(t, 2, len(c.ruIndex))
 }
 
 func TestMruEviction(t *testing.T) {
@@ -83,7 +97,6 @@ func TestMruEviction(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
-	require.Equal(t, 2, len(c.ruIndex))
 }
 
 func TestTtlExpiry(t *testing.T) {
@@ -109,7 +122,12 @@ func TestTtlExpiry(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
-	require.Equal(t, 0, len(c.ruIndex))
+
+	stats := c.Stats()
+	require.Equal(t, uint64(1), stats.Hits)
+	require.Equal(t, uint64(1), stats.Misses)
+	require.Equal(t, uint64(0), stats.Evictions)
+	require.Equal(t, uint64(1), stats.Expired)
 }
 
 func TestOldestEviction(t *testing.T) {
@@ -128,4 +146,10 @@ func TestOldestEviction(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
+
+	stats := c.Stats()
+	require.Equal(t, uint64(1), stats.Hits)
+	require.Equal(t, uint64(1), stats.Misses)
+	require.Equal(t, uint64(1), stats.Evictions)
+	require.Equal(t, uint64(0), stats.Expired)
 }

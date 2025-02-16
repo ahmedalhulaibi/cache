@@ -5,10 +5,10 @@ import (
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/requestid"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/userid"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/httputil"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/tracing"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/requestid"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/userid"
+	"github.com/ahmedalhulaibi/cache-api/internal/httputil"
+	"github.com/ahmedalhulaibi/cache-api/internal/tracing"
 )
 
 func CustomMatcher(key string) (string, bool) {

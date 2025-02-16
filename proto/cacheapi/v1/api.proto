@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package cache.v1;
+package cacheapi.v1;
 
 import "google/api/annotations.proto";
 
@@ -19,25 +19,52 @@ service CacheService {
       get: "/v1/get/{bucket}/{key}"
     };
   };
+
+  rpc GetStats(GetStatsRequest) returns (GetStatsResponse) {
+    option (google.api.http) = {
+      get: "/v1/stats"
+    };
+  };
 }
 
 message SetRequest {
   string bucket = 1;
   string key = 2;
   string value = 3;
-  // ttl in seconds, use 0 or <0 for no expiration
-  int32 ttl = 4;
+  Options options = 4;
 }
-
 message SetResponse {
-  string message = 1;
 }
 
 message GetRequest {
   string bucket = 1;
   string key = 2;
+  Options options = 3;
 }
 
 message GetResponse {
   string value = 1;
+}
+
+message Options {
+  int64 ttlSeconds = 1;
+  EvictionPolicy evictionPolicy = 2;
+}
+
+enum EvictionPolicy {
+  EVICTION_UNSPECIFIED = 0;
+  EVICTION_LRU = 1;
+  EVICTION_MRU = 2;
+  EVICTION_OLDEST = 3;
+  EVICTION_NEWEST= 4;
+}
+
+message GetStatsRequest {
+}
+
+message GetStatsResponse {
+  uint64 hits = 1;
+  uint64 misses = 2;
+  uint64 evictions = 3;
+  uint64 expired = 4;
 }

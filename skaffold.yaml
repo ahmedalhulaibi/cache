@@ -6,15 +6,15 @@ build:
   tagPolicy:
     sha256: {}
   artifacts:
-    - image: ghcr.io/ahmedalhulaibi/hello-world-api
+    - image: ghcr.io/ahmedalhulaibi/cache-api
       context: ./go
       docker:
         cacheFrom:
-        - "ghcr.io/ahmedalhulaibi/hello-world-api:latest"
+        - "ghcr.io/ahmedalhulaibi/cache-api:latest"
         dockerfile: ./go/Dockerfile
         buildArgs:
           BUILDPKG: cmd/api
-          PKG: github.com/ahmedalhulaibi/hello-world-api
+          PKG: github.com/ahmedalhulaibi/cache-api
           GOPRIVATE: github.com/ahmedalhulaibi
         ssh: default=./.ssh/id_rsa
       sync:
@@ -39,13 +39,13 @@ profiles:
     patches:
       - op: replace
         path: /build/artifacts/0/image
-        value: localhost:12345/ahmedalhulaibi/hello-world-api
+        value: localhost:12345/ahmedalhulaibi/cache-api
   - name: local-overlay
     activation:
       - command: dev
       - command: run
     deploy:
-      kubeContext: k3d-hello-world-api
+      kubeContext: k3d-cache-api
       kustomize:
         paths:
           - infra/k8s/overlays/local
@@ -60,7 +60,7 @@ profiles:
     activation:
       - command: debug
     deploy:
-      kubeContext: k3d-hello-world-api
+      kubeContext: k3d-cache-api
       kustomize:
         paths:
           - infra/k8s/overlays/debug

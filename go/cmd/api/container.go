@@ -16,14 +16,16 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
-	helloworldv1 "github.com/ahmedalhulaibi/hello-world-api/internal/gen/helloworld/v1"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/greeter"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/instanceid"
-	logmw "github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/log"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/requestid"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/userid"
-	httputilgrpcgateway "github.com/ahmedalhulaibi/hello-world-api/internal/httputil/grpcgateway"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/tracing"
+	"github.com/ahmedalhulaibi/cache-api/internal/cache"
+	cacheapiv1 "github.com/ahmedalhulaibi/cache-api/internal/gen/cacheapi/v1"
+	helloworldv1 "github.com/ahmedalhulaibi/cache-api/internal/gen/helloworld/v1"
+	"github.com/ahmedalhulaibi/cache-api/internal/greeter"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/instanceid"
+	logmw "github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/log"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/requestid"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/userid"
+	httputilgrpcgateway "github.com/ahmedalhulaibi/cache-api/internal/httputil/grpcgateway"
+	"github.com/ahmedalhulaibi/cache-api/internal/tracing"
 )
 
 type container struct {
@@ -40,10 +42,11 @@ type container struct {
 		gatewayListener net.Listener
 
 		greeterService helloworldv1.GreeterServiceServer
+		cacheService   cacheapiv1.CacheServiceServer
 	}
 
 	once struct {
-		logger, grpcServer, gatewayRouter, gatewayServer, grpcListener, gatewayListener, greeterService sync.Once
+		logger, grpcServer, gatewayRouter, gatewayServer, grpcListener, gatewayListener, greeterService, cacheService sync.Once
 	}
 }
 
@@ -51,6 +54,14 @@ func newContainer(config *Config) *container {
 	return &container{
 		config: config,
 	}
+}
+
+func (c *container) cacheService() cacheapiv1.CacheServiceServer {
+	c.once.cacheService.Do(func() {
+		c.state.cacheService = cache.NewCacheService(c.logger())
+	})
+
+	return c.state.cacheService
 }
 
 func (c *container) greeterService() helloworldv1.GreeterServiceServer {
@@ -99,6 +110,7 @@ func (c *container) grpcServer() *grpc.Server {
 		)
 
 		helloworldv1.RegisterGreeterServiceServer(c.state.grpcServer, c.greeterService())
+		cacheapiv1.RegisterCacheServiceServer(c.state.grpcServer, c.cacheService())
 		reflection.Register(c.state.grpcServer)
 	})
 
@@ -121,6 +133,15 @@ func (c *container) gatewayRouter() *runtime.ServeMux {
 		}
 
 		err = helloworldv1.RegisterGreeterServiceHandler(
+			ctx,
+			c.state.gatewayRouter,
+			conn,
+		)
+		if err != nil {
+			c.logger().Fatalw(context.Background(), "gateway-router", "err", err)
+		}
+
+		err = cacheapiv1.RegisterCacheServiceHandler(
 			ctx,
 			c.state.gatewayRouter,
 			conn,

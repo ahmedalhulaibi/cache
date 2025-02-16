@@ -3,9 +3,9 @@ package tracing
 import (
 	"context"
 
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/instanceid"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/requestid"
-	"github.com/ahmedalhulaibi/hello-world-api/internal/grpcutil/interceptors/userid"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/instanceid"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/requestid"
+	"github.com/ahmedalhulaibi/cache-api/internal/grpcutil/interceptors/userid"
 	"github.com/ahmedalhulaibi/loggy"
 	"go.opencensus.io/trace"
 	"google.golang.org/grpc"

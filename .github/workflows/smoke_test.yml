@@ -53,4 +53,4 @@ jobs:
           SSH_AUTH_SOCK: ${{ steps.ssh-setup.outputs.SSH_AUTH_SOCK }}
       -
         name: Run Smoke Tests
-        run: K6_HTTP_BASE_URL="http://localhost:8888/hello-world-api" make smoke-test
+        run: K6_HTTP_BASE_URL="http://localhost:8888/cache-api" make smoke-test

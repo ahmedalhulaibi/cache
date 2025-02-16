@@ -17,8 +17,8 @@ export let profiles = {
         scenarios: {
             contacts: {
                 executor: 'per-vu-iterations',
-                vus: 1,
-                iterations: 1,
+                vus: 300,
+                iterations: 255,
                 maxDuration: '1m',
             },
         },

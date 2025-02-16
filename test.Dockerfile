@@ -7,7 +7,7 @@ RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 # Force fetching modules over SSH
 RUN git config --system url."ssh://git@github.com/".insteadOf "https://github.com/"
 
-WORKDIR /go/src/github.com/ahmedalhulaibi/hello-world-api
+WORKDIR /go/src/github.com/ahmedalhulaibi/cache-api
 
 # Setup goprivate to fetch ahmedalhulaibi dependencies
 ENV GOPRIVATE="github.com/ahmedalhulaibi"

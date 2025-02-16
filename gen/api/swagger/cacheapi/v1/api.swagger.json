@@ -1,0 +1,235 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "cacheapi/v1/api.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "CacheService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/v1/get/{bucket}/{key}": {
+      "get": {
+        "summary": "Get retrieves a value from the cache.",
+        "operationId": "CacheService_Get",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "bucket",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "options.ttlSeconds",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "format": "int64"
+          },
+          {
+            "name": "options.evictionPolicy",
+            "in": "query",
+            "required": false,
+            "type": "string",
+            "enum": [
+              "EVICTION_UNSPECIFIED",
+              "EVICTION_LRU",
+              "EVICTION_MRU",
+              "EVICTION_OLDEST",
+              "EVICTION_NEWEST"
+            ],
+            "default": "EVICTION_UNSPECIFIED"
+          }
+        ],
+        "tags": [
+          "CacheService"
+        ]
+      }
+    },
+    "/v1/set": {
+      "post": {
+        "summary": "Set insert or update a key-value pair in the cache.",
+        "operationId": "CacheService_Set",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1SetResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/v1SetRequest"
+            }
+          }
+        ],
+        "tags": [
+          "CacheService"
+        ]
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "operationId": "CacheService_GetStats",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetStatsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "tags": [
+          "CacheService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1EvictionPolicy": {
+      "type": "string",
+      "enum": [
+        "EVICTION_UNSPECIFIED",
+        "EVICTION_LRU",
+        "EVICTION_MRU",
+        "EVICTION_OLDEST",
+        "EVICTION_NEWEST"
+      ],
+      "default": "EVICTION_UNSPECIFIED"
+    },
+    "v1GetResponse": {
+      "type": "object",
+      "properties": {
+        "value": {
+          "type": "string"
+        }
+      }
+    },
+    "v1GetStatsResponse": {
+      "type": "object",
+      "properties": {
+        "hits": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "misses": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "evictions": {
+          "type": "string",
+          "format": "uint64"
+        },
+        "expired": {
+          "type": "string",
+          "format": "uint64"
+        }
+      }
+    },
+    "v1Options": {
+      "type": "object",
+      "properties": {
+        "ttlSeconds": {
+          "type": "string",
+          "format": "int64"
+        },
+        "evictionPolicy": {
+          "$ref": "#/definitions/v1EvictionPolicy"
+        }
+      }
+    },
+    "v1SetRequest": {
+      "type": "object",
+      "properties": {
+        "bucket": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "options": {
+          "$ref": "#/definitions/v1Options"
+        }
+      }
+    },
+    "v1SetResponse": {
+      "type": "object"
+    }
+  }
+}

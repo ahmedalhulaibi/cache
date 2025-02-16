@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	helloworldv1 "github.com/ahmedalhulaibi/hello-world-api/internal/gen/helloworld/v1"
+	helloworldv1 "github.com/ahmedalhulaibi/cache-api/internal/gen/helloworld/v1"
 )
 
 type greeter struct {

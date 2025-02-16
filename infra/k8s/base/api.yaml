@@ -1,26 +1,26 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: hello-world-api
+  name: cache-api
   labels:
-    app: hello-world-api 
+    app: cache-api 
 spec:
-  replicas: 3
+  replicas: 1
   selector:
     matchLabels:
-      app: hello-world-api
+      app: cache-api
   template:
     metadata:
       annotations:
         linkerd.io/inject: enabled
       labels:
-        app: hello-world-api
+        app: cache-api
     spec:
       imagePullSecrets:
       - name: regcred
       containers:
-      - name: hello-world-api
-        image: ghcr.io/ahmedalhulaibi/hello-world-api:v0.0.9
+      - name: cache-api
+        image: ghcr.io/ahmedalhulaibi/cache-api:v0.0.9
         ports:
         - containerPort: 8080
         - containerPort: 8090
@@ -35,9 +35,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: hello-world-api-svc
+  name: cache-api-svc
   labels:
-    run: hello-world-api
+    run: cache-api
 spec:
   type: ClusterIP
   ports:
@@ -50,63 +50,63 @@ spec:
     port: 8090
     protocol: TCP
   selector:
-    app: hello-world-api
+    app: cache-api
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: IngressRoute
 metadata:
-  name: hello-world-api-ir
+  name: cache-api-ir
 spec:
   entryPoints:
     - web
   routes:
-  - match: Host(`hello-world-api.dev`, `hello-world-api.127.0.0.1.nip.io`)
+  - match: Host(`cache-api.dev`, `cache-api.127.0.0.1.nip.io`)
     kind: Rule
     services:
-    - name: hello-world-api-svc
+    - name: cache-api-svc
       port: 8080
     middlewares:
-    - name: hello-world-api-http-l5d-dst-override
-  - match: PathPrefix(`/hello-world-api`)
+    - name: cache-api-http-l5d-dst-override
+  - match: PathPrefix(`/cache-api`)
     kind: Rule
     services:
-    - name: hello-world-api-svc
+    - name: cache-api-svc
       port: 8080
     middlewares:
-    - name: hello-world-api-stripprefix
-    - name: hello-world-api-http-l5d-dst-override
+    - name: cache-api-stripprefix
+    - name: cache-api-http-l5d-dst-override
   - match: Headers(`content-type`,`application/grpc`)
     kind: Rule
     services:
-    - name: hello-world-api-svc
+    - name: cache-api-svc
       port: 8090
       scheme: h2c
     middlewares:
-    - name: hello-world-api-grpc-l5d-dst-override
+    - name: cache-api-grpc-l5d-dst-override
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: hello-world-api-stripprefix
+  name: cache-api-stripprefix
 spec:
   stripPrefix:
     prefixes:
-      - /hello-world-api
+      - /cache-api
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: hello-world-api-http-l5d-dst-override
+  name: cache-api-http-l5d-dst-override
 spec:
   headers:
     customRequestHeaders:
-      l5d-dst-override: "hello-world-api-svc.default.svc.cluster.local:8080"
+      l5d-dst-override: "cache-api-svc.default.svc.cluster.local:8080"
 ---
 apiVersion: traefik.containo.us/v1alpha1
 kind: Middleware
 metadata:
-  name: hello-world-api-grpc-l5d-dst-override
+  name: cache-api-grpc-l5d-dst-override
 spec:
   headers:
     customRequestHeaders:
-      l5d-dst-override: "hello-world-api-svc.default.svc.cluster.local:8090"
+      l5d-dst-override: "cache-api-svc.default.svc.cluster.local:8090"

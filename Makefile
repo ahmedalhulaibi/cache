@@ -1,15 +1,15 @@
 K3D_REGISTRIES_YAML ?= ./infra/k3d-registries.yaml
-K3D_CLUSTER_NAME ?= hello-world-api
+K3D_CLUSTER_NAME ?= cache-api
 K3D_HOST_PORT ?= 8888
 
 GO_SRC_DIR ?= ./go
 
-SSH_GIT := ssh://git@github.com/ahmedalhulaibi/hello-world-api.git
-HTTPS_GIT := https://github.com/ahmedalhulaibi/hello-world-api.git
-PKG := github.com/ahmedalhulaibi/hello-world-api
+SSH_GIT := ssh://git@github.com/ahmedalhulaibi/cache-api.git
+HTTPS_GIT := https://github.com/ahmedalhulaibi/cache-api.git
+PKG := github.com/ahmedalhulaibi/cache-api
 GOPRIVATE := github.com/ahmedalhulaibi
 
-K6_HTTP_BASE_URL ?= http://localhost:8888/hello-world-api
+K6_HTTP_BASE_URL ?= http://localhost:8888/cache-api
 K6_GRPC_BASE_URL ?= localhost:8888
 K6_GRPC_PROTO_DIR ?= ../..
 K6_GRPC_PROTO_FILES ?= $(shell find ./proto | grep "\.proto" | tr '\n' ';')
@@ -52,7 +52,7 @@ build-api:
 
 build-docker: .ssh/id_rsa
 	$(info $(_bullet) Building docker <api>)
-	docker build --no-cache -f ./go/Dockerfile --build-arg BUILDPKG=cmd/api --build-arg PKG=$(PKG) --build-arg GOPRIVATE=$(GOPRIVATE) --ssh default=.ssh/id_rsa $(GO_SRC_DIR) -t ghcr.io/ahmedalhulaibi/hello-world-api:latest
+	docker build --no-cache -f ./go/Dockerfile --build-arg BUILDPKG=cmd/api --build-arg PKG=$(PKG) --build-arg GOPRIVATE=$(GOPRIVATE) --ssh default=.ssh/id_rsa $(GO_SRC_DIR) -t ghcr.io/ahmedalhulaibi/cache-api:latest
 
 bootstrap-deployment: $(KUBECTL) ## Bootstrap deployment
 	$(info $(_bullet) Bootstraping <deployment>)

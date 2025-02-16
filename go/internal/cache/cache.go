@@ -31,6 +31,7 @@ type Cache interface {
 	Set(bucket, key string, value []byte, opts ...Option) error
 	Get(bucket, key string, opts ...Option) ([]byte, error)
 	Delete(bucket, key string, opts ...Option) error
+	Stats() stats
 }
 
 type EvictionPolicy string
@@ -54,7 +55,7 @@ type Options struct {
 func getOptions(opts ...Option) (*Options, error) {
 	o := &Options{
 		ttl:            -1,
-		evictionPolicy: EvictDisabled,
+		evictionPolicy: EvictLRU,
 		clock:          time.Now,
 		evictOnGet:     true,
 	}
@@ -96,14 +97,20 @@ Assumptions:
 2. Given that a cache is at capacity and a `Get` method is called and the Oldest eviction policy is applied, we will still return the value for the key
 */
 
-var _ Cache = &bucket{}
+var _ Cache = (*buckets)(nil)
 
-type bucket struct {
+type buckets struct {
 	buckets map[string]cache
 	sync.RWMutex
 }
 
-func (b *bucket) Set(bucket, key string, value []byte, opts ...Option) error {
+func NewCache() *buckets {
+	return &buckets{
+		buckets: make(map[string]cache),
+	}
+}
+
+func (b *buckets) Set(bucket, key string, value []byte, opts ...Option) error {
 	o, err := getOptions(opts...)
 	if err != nil {
 		return err
@@ -117,7 +124,7 @@ func (b *bucket) Set(bucket, key string, value []byte, opts ...Option) error {
 	return b.buckets[bucket].Set(key, value, o)
 }
 
-func (b *bucket) Get(bucket, key string, opts ...Option) ([]byte, error) {
+func (b *buckets) Get(bucket, key string, opts ...Option) ([]byte, error) {
 	o, err := getOptions(opts...)
 	if err != nil {
 		return nil, err
@@ -131,7 +138,7 @@ func (b *bucket) Get(bucket, key string, opts ...Option) ([]byte, error) {
 	return b.buckets[bucket].Get(key, o)
 }
 
-func (b *bucket) Delete(bucket, key string, opts ...Option) error {
+func (b *buckets) Delete(bucket, key string, opts ...Option) error {
 	o, err := getOptions(opts...)
 	if err != nil {
 		return err
@@ -145,10 +152,30 @@ func (b *bucket) Delete(bucket, key string, opts ...Option) error {
 	return b.buckets[bucket].Delete(key, o)
 }
 
+func (b *buckets) Stats() stats {
+	b.RLock()
+	defer b.RUnlock()
+	var h, m, e, ex uint64
+	for _, c := range b.buckets {
+		s := c.Stats()
+		h += s.Hits
+		m += s.Misses
+		e += s.Evictions
+		ex += s.Expired
+	}
+	return stats{
+		Hits:      h,
+		Misses:    m,
+		Evictions: e,
+		Expired:   ex,
+	}
+}
+
 type cache interface {
 	Set(key string, value []byte, opts *Options) error
 	Get(key string, opts *Options) ([]byte, error)
 	Delete(key string, opts *Options) error
+	Stats() stats
 }
 
 func newCache(capacity int) *cacheImplementation {
@@ -174,7 +201,12 @@ type cacheImplementation struct {
 	ruIndex    map[string]*list.Element
 	oldestList *list.List // doubly linked list, front is oldest
 	capacity   int
+	stats      stats
 	sync.RWMutex
+}
+
+type stats struct {
+	Hits, Misses, Evictions, Expired uint64
 }
 
 func (c *cacheImplementation) Set(key string, value []byte, opts *Options) error {
@@ -229,12 +261,15 @@ func (c *cacheImplementation) Get(key string, opts *Options) ([]byte, error) {
 
 	elem, ok := c.ruIndex[key]
 	if !ok {
+		c.stats.Misses++
 		return nil, nil
 	}
 
 	record := elem.Value.(*list.Element).Value.(*record)
 
 	if record.expiry != nil && opts.clock().After(*record.expiry) {
+		c.stats.Misses++
+		c.stats.Expired++
 		c.remove(elem)
 		return nil, nil
 	}
@@ -247,6 +282,7 @@ func (c *cacheImplementation) Get(key string, opts *Options) ([]byte, error) {
 		c.ruList.MoveToFront(elem.Value.(*list.Element))
 	}
 
+	c.stats.Hits++
 	return record.value, nil
 }
 
@@ -261,6 +297,12 @@ func (c *cacheImplementation) Delete(key string, opts *Options) error {
 
 	c.remove(elem)
 	return nil
+}
+
+func (c *cacheImplementation) Stats() stats {
+	c.RLock()
+	defer c.RUnlock()
+	return c.stats
 }
 
 func (c *cacheImplementation) remove(e *list.Element) {
@@ -280,6 +322,7 @@ func (c *cacheImplementation) evict(e EvictionPolicy) error {
 	}
 
 	c.remove(elem)
+	c.stats.Evictions++
 	return nil
 }
 
