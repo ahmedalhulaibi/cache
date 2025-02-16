@@ -4,10 +4,10 @@ ARG BUILDPKG
 
 FROM golang:1.24 AS builder
 
-RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
+# RUN mkdir -p -m 0600 ~/.ssh && ssh-keyscan github.com >> ~/.ssh/known_hosts
 
 # Force fetching modules over SSH
-RUN git config --system url."ssh://git@github.com/".insteadOf "https://github.com/"
+# RUN git config --system url."ssh://git@github.com/".insteadOf "https://github.com/"
 
 ARG PKG
 ARG BUILDPKG

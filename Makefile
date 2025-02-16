@@ -1,3 +1,6 @@
+DOCKER_REST_PORT_MAPPING ?= 8080:8080
+DOCKER_GRPC_PORT_MAPPING ?= 8090:8090
+
 K3D_REGISTRIES_YAML ?= ./infra/k3d-registries.yaml
 K3D_CLUSTER_NAME ?= cache-api
 K3D_HOST_PORT ?= 8888
@@ -43,16 +46,23 @@ vendor: vendor-go
 	@mkdir -p .ssh
 	@ln -sf $(HOME)/.ssh/id_rsa .ssh/id_rsa
 
-.PHONY: build-api build-docker pr-ready install_kustomize
+.PHONY: build-api build-docker pr-ready run-local
 
 build-api:
 	$(info $(_bullet) Building <api>)
-	cd $(GO_SRC_DIR) && $(GO) build -o bin/api ./cmd/api
+	cd $(GO_SRC_DIR) && $(GO) build -o bin/api ./cmd/api && cd -
 
+run-local: build-api
+	$(info $(_bullet) Running <api>)
+	$(GO_SRC_DIR)/bin/api
 
-build-docker: .ssh/id_rsa
+build-docker: # .ssh/id_rsa
 	$(info $(_bullet) Building docker <api>)
-	docker build --no-cache -f ./go/Dockerfile --build-arg BUILDPKG=cmd/api --build-arg PKG=$(PKG) --build-arg GOPRIVATE=$(GOPRIVATE) --ssh default=.ssh/id_rsa $(GO_SRC_DIR) -t ghcr.io/ahmedalhulaibi/cache-api:latest
+	docker build --no-cache -f ./go/Dockerfile --build-arg BUILDPKG=cmd/api --build-arg PKG=$(PKG) --build-arg GOPRIVATE=$(GOPRIVATE) $(GO_SRC_DIR) -t ghcr.io/ahmedalhulaibi/cache-api:latest
+
+run-docker: build-docker
+	$(info $(_bullet) Running docker <api>)
+	docker run -p $(DOCKER_REST_PORT_MAPPING) -p $(DOCKER_GRPC_PORT_MAPPING) ghcr.io/ahmedalhulaibi/cache-api:latest
 
 bootstrap-deployment: $(KUBECTL) ## Bootstrap deployment
 	$(info $(_bullet) Bootstraping <deployment>)
