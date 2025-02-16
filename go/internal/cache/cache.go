@@ -46,12 +46,17 @@ const (
 type Options struct {
 	ttl            time.Duration
 	evictionPolicy EvictionPolicy
+	clock          func() time.Time
+	// for testing purposes override this behaviour
+	evictOnGet bool
 }
 
 func getOptions(opts ...Option) (*Options, error) {
 	o := &Options{
 		ttl:            -1,
 		evictionPolicy: EvictDisabled,
+		clock:          time.Now,
+		evictOnGet:     true,
 	}
 	for _, opt := range opts {
 		if err := opt(o); err != nil {
@@ -73,6 +78,14 @@ func WithTTL(ttl time.Duration) Option {
 func WithEvictionPolicy(policy EvictionPolicy) Option {
 	return func(o *Options) error {
 		o.evictionPolicy = policy
+		return nil
+	}
+}
+
+// for testing purposes
+func withClock(clock func() time.Time) Option {
+	return func(o *Options) error {
+		o.clock = clock
 		return nil
 	}
 }
@@ -165,15 +178,15 @@ func (c *cacheImplementation) Set(key string, value []byte, opts *Options) error
 	c.Lock()
 	defer c.Unlock()
 
-	if c.recentlyUsed.Len() == c.capacity {
-		if err := c.evict(opts); err != nil {
+	if c.recentlyUsed.Len() >= c.capacity {
+		if err := c.evict(opts.evictionPolicy); err != nil {
 			return err
 		}
 	}
 
 	var expiry *time.Time = nil
 	if opts.ttl > 0 {
-		t := time.Now().Add(opts.ttl)
+		t := opts.clock().Add(opts.ttl)
 		expiry = &t
 	}
 
@@ -191,10 +204,12 @@ func (c *cacheImplementation) Set(key string, value []byte, opts *Options) error
 		return nil
 	}
 
-	newElem := list.Element{Value: r}
+	if c.recentlyUsed.Len() == 0 {
+		c.keys[key] = c.recentlyUsed.PushFront(r)
+		return nil
+	}
 
-	c.recentlyUsed.PushFront(&newElem)
-	c.keys[key] = &newElem
+	c.keys[key] = c.recentlyUsed.InsertBefore(r, c.recentlyUsed.Front())
 
 	return nil
 }
@@ -208,16 +223,40 @@ func (c *cacheImplementation) Get(key string, opts *Options) ([]byte, error) {
 		return nil, nil
 	}
 
-	c.recentlyUsed.MoveToFront(elem)
-	return elem.Value.(*record).value, nil
+	if elem.Value.(*record).expiry != nil && opts.clock().After(*elem.Value.(*record).expiry) {
+		c.recentlyUsed.Remove(elem)
+		delete(c.keys, key)
+		return nil, nil
+	}
+
+	record := elem.Value.(*record)
+	if opts.evictOnGet && c.recentlyUsed.Len() >= c.capacity {
+		if err := c.evict(EvictOldest); err != nil {
+			return nil, err
+		}
+	} else {
+		c.recentlyUsed.MoveToFront(elem)
+	}
+
+	return record.value, nil
 }
 
 func (c *cacheImplementation) Delete(key string, opts *Options) error {
-	panic("unimplemented")
+	c.Lock()
+	defer c.Unlock()
+
+	elem, ok := c.keys[key]
+	if !ok {
+		return nil
+	}
+
+	c.recentlyUsed.Remove(elem)
+	delete(c.keys, key)
+	return nil
 }
 
-func (c *cacheImplementation) evict(opts *Options) error {
-	elem, err := c.getEvictionCandidate(opts)
+func (c *cacheImplementation) evict(e EvictionPolicy) error {
+	elem, err := c.getEvictionCandidate(e)
 	if err != nil {
 		return err
 	}
@@ -231,8 +270,8 @@ func (c *cacheImplementation) evict(opts *Options) error {
 	return nil
 }
 
-func (c *cacheImplementation) getEvictionCandidate(opts *Options) (*list.Element, error) {
-	switch opts.evictionPolicy {
+func (c *cacheImplementation) getEvictionCandidate(e EvictionPolicy) (*list.Element, error) {
+	switch e {
 	case EvictLRU:
 		return c.getLru()
 	case EvictMRU:
