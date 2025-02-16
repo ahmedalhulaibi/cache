@@ -1,0 +1,17 @@
+run:
+  skip-dirs:
+    - gen
+    - makefiles
+    - swagger
+    - vendor
+    - bin
+    - config
+    - infra
+    - nats # temporarily ignored
+    - httputil # temporarily ignored
+
+  skip-dirs-use-default: true
+
+linters-settings:
+  staticcheck:
+    checks: ["all", "-SA1029"]

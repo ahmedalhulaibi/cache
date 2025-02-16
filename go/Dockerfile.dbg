@@ -1,0 +1,27 @@
+##syntax=docker/dockerfile:1.2
+ARG PKG
+ARG BUILDPKG
+
+FROM golang:1.24 AS debugger
+
+RUN go install github.com/go-delve/delve/cmd/dlv@latest
+
+ARG PKG
+ARG BUILDPKG
+WORKDIR /go/src/$PKG
+
+COPY . .
+
+RUN go mod vendor
+
+ENV BUILDPKG $BUILDPKG
+
+CMD dlv \
+    --listen=:2345 \
+    --headless=true \
+    --log=true \
+    --log-output=debugger,debuglineerr,gdbwire,lldbout,rpc \
+    --accept-multiclient \
+    --api-version=2 \
+    debug ./$BUILDPKG
+

@@ -1,0 +1,18 @@
+FROM golang:1.24.0 AS builder
+# install xz required to uncompress watchexec
+ARG PKG
+ARG BUILDPKG
+WORKDIR /go/src/$PKG
+
+COPY go.* .
+COPY internal ./internal
+COPY gen ./gen
+COPY cmd ./cmd
+
+# download dependencies
+RUN go get ./$BUILDPKG
+
+ENV BUILDPKG $BUILDPKG
+
+# restart service on file changes
+CMD go run ./$BUILDPKG

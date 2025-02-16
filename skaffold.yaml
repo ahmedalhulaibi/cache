@@ -1,0 +1,70 @@
+apiVersion: skaffold/v2beta21
+kind: Config
+metadata:
+  name: api-skaffold
+build:
+  tagPolicy:
+    sha256: {}
+  artifacts:
+    - image: ghcr.io/ahmedalhulaibi/hello-world-api
+      context: ./go
+      docker:
+        cacheFrom:
+        - "ghcr.io/ahmedalhulaibi/hello-world-api:latest"
+        dockerfile: ./go/Dockerfile
+        buildArgs:
+          BUILDPKG: cmd/api
+          PKG: github.com/ahmedalhulaibi/hello-world-api
+          GOPRIVATE: github.com/ahmedalhulaibi
+        ssh: default=./.ssh/id_rsa
+      sync:
+        infer:
+        - 'go/internal/**/*.go'
+        - 'go/cmd/**/*.go'
+        - 'go/gen/**/*.go'
+  local:
+    useBuildkit: true
+    push: true
+deploy:
+  statusCheckDeadlineSeconds: 300
+  kustomize:
+    paths:
+      - infra/k8s/base
+profiles:
+  - name: local-registry
+    activation:
+      - command: dev
+      - command: run
+      - command: debug
+    patches:
+      - op: replace
+        path: /build/artifacts/0/image
+        value: localhost:12345/ahmedalhulaibi/hello-world-api
+  - name: local-overlay
+    activation:
+      - command: dev
+      - command: run
+    deploy:
+      kubeContext: k3d-hello-world-api
+      kustomize:
+        paths:
+          - infra/k8s/overlays/local
+  - name: build-dev
+    activation:
+      - command: dev
+    patches:
+      - op: replace
+        path: /build/artifacts/0/docker/dockerfile
+        value: ./go/Dockerfile.dev
+  - name: debug
+    activation:
+      - command: debug
+    deploy:
+      kubeContext: k3d-hello-world-api
+      kustomize:
+        paths:
+          - infra/k8s/overlays/debug
+    patches:
+      - op: replace
+        path: /build/artifacts/0/docker/dockerfile
+        value: ./go/Dockerfile.dbg

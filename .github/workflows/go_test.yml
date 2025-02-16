@@ -1,0 +1,34 @@
+name: Go Lint and Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }} # using GITHUB_TOKEN as auth for this repo
+      - 
+        name: Set up Go
+        uses: actions/setup-go@v2
+        if: success()
+        with:
+          go-version: 1.24
+      - 
+        name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v2.5.2
+        if: success()
+        with:
+          skip-go-installation: true
+          working-directory: ./go
+      - 
+        name: Test
+        run: cd ./go && go test -v ./...

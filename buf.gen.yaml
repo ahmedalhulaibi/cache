@@ -1,0 +1,25 @@
+version: v2
+clean: true
+managed:
+  enabled: true
+  disable:
+    # Don't modify any file option or field option for googleapis
+    - module: buf.build/googleapis/googleapis
+  override:
+    - file_option: go_package_prefix
+      value: go/internal/gen
+plugins:
+  - remote: buf.build/protocolbuffers/go:v1.36.5
+    out: go/internal/gen
+    opt: paths=source_relative
+  - remote: buf.build/grpc/go:v1.5.1
+    out: go/internal/gen
+    opt:
+      - paths=source_relative
+  - remote: buf.build/grpc-ecosystem/openapiv2:v2.26.1
+    out: gen/api/swagger
+  - remote: buf.build/grpc-ecosystem/gateway:v2.26.1
+    out: go/internal/gen
+    opt: paths=source_relative
+inputs:
+  - directory: proto

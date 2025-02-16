@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world-api
+  labels:
+    app: hello-world-api 
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hello-world-api
+  template:
+    metadata:
+      annotations:
+        linkerd.io/inject: enabled
+      labels:
+        app: hello-world-api
+    spec:
+      imagePullSecrets:
+      - name: regcred
+      containers:
+      - name: hello-world-api
+        image: ghcr.io/ahmedalhulaibi/hello-world-api:v0.0.9
+        ports:
+        - containerPort: 8080
+        - containerPort: 8090
+        env:
+        - name: INSTANCE_ID
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: OC_AGENT_HOST 
+          value: "collector.linkerd-jaeger:55678"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-world-api-svc
+  labels:
+    run: hello-world-api
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    targetPort: 8080
+    port: 8080
+    protocol: TCP
+  - name: grpc
+    targetPort: 8090
+    port: 8090
+    protocol: TCP
+  selector:
+    app: hello-world-api
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: hello-world-api-ir
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`hello-world-api.dev`, `hello-world-api.127.0.0.1.nip.io`)
+    kind: Rule
+    services:
+    - name: hello-world-api-svc
+      port: 8080
+    middlewares:
+    - name: hello-world-api-http-l5d-dst-override
+  - match: PathPrefix(`/hello-world-api`)
+    kind: Rule
+    services:
+    - name: hello-world-api-svc
+      port: 8080
+    middlewares:
+    - name: hello-world-api-stripprefix
+    - name: hello-world-api-http-l5d-dst-override
+  - match: Headers(`content-type`,`application/grpc`)
+    kind: Rule
+    services:
+    - name: hello-world-api-svc
+      port: 8090
+      scheme: h2c
+    middlewares:
+    - name: hello-world-api-grpc-l5d-dst-override
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: hello-world-api-stripprefix
+spec:
+  stripPrefix:
+    prefixes:
+      - /hello-world-api
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: hello-world-api-http-l5d-dst-override
+spec:
+  headers:
+    customRequestHeaders:
+      l5d-dst-override: "hello-world-api-svc.default.svc.cluster.local:8080"
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: hello-world-api-grpc-l5d-dst-override
+spec:
+  headers:
+    customRequestHeaders:
+      l5d-dst-override: "hello-world-api-svc.default.svc.cluster.local:8090"

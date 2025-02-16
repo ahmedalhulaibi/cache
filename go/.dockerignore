@@ -1,0 +1,16 @@
+vendor/
+docker-compose.yml
+infra/
+bin/
+config/
+makefiles/
+test/
+.env
+.terraform.lock.hcl
+ansible.cfg
+*.yaml
+*.yml
+Makefile
+Dockerfile*
+proto/
+.vscode

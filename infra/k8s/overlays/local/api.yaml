@@ -1,0 +1,14 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: hello-world-api
+  template:
+    spec:
+      containers:
+      - name: hello-world-api
+        image: k3d-hello-world-api.registry.localhost:12345/ahmedalhulaibi/hello-world-api:latest

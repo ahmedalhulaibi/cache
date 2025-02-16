@@ -1,0 +1,82 @@
+name: Build Docker Image
+
+on:
+  workflow_dispatch:
+  push:
+     tags:
+      - 'v*' 
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }} # using GITHUB_TOKEN as auth for this repo
+      - 
+        name: Login to GitHub Container Registry
+        uses: docker/login-action@v1
+        if: success()
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+      - 
+        name: Setup SSH Keys and known_hosts
+        id: ssh-setup
+        if: success()
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          SSH_KEY: ${{ secrets.ssh_key }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          echo "$SSH_KEY" > ~/.ssh/ssh_key
+          chmod 600 ~/.ssh/ssh_key
+          ssh-add ~/.ssh/ssh_key
+          echo "::set-output name=SSH_AUTH_SOCK::$SSH_AUTH_SOCK"
+          echo "::set-output name=SSH_KEY_PATH::$HOME/.ssh/ssh_key"
+      -
+        name: API Docker meta
+        id: docker_meta_api
+        uses: docker/metadata-action@v3
+        with: 
+          images: ghcr.io/${{ github.repository }}
+
+      - 
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        if: success()
+        with:
+          driver-opts: network=host
+      - 
+        name: Setup build cache
+        uses: actions/cache@v2
+        if: success()
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('./go/Dockerfile') }}
+      - 
+        name: API Docker Build and Push
+        id: docker_build_api
+        if: success()
+        uses: docker/build-push-action@v2
+        env:
+          SSH_AUTH_SOCK: ${{ steps.ssh-setup.outputs.SSH_AUTH_SOCK }}
+        with:
+          context: ./go
+          file: ./go/Dockerfile
+          push: true
+          build-args: |
+            PKG=github.com/${{ github.repository }}
+            BUILDPKG=cmd/api
+            GOPRIVATE=github.com/${{ github.repository_owner }}
+          tags: ${{ steps.docker_meta_api.outputs.tags }}
+          labels: ${{ steps.docker_meta_api.outputs.labels }}
+          ssh: default=${{ steps.ssh-setup.outputs.SSH_KEY_PATH }}
+          cache-from: type=local,src=/tmp/.buildx-cache
+          cache-to: type=local,dest=/tmp/.buildx-cache

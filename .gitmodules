@@ -1,0 +1,6 @@
+[submodule "googleapis"]
+	path = googleapis
+	url = git@github.com:googleapis/googleapis.git
+[submodule "grpc-gateway"]
+	path = grpc-gateway
+	url = git@github.com:grpc-ecosystem/grpc-gateway.git

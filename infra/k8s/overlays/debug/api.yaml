@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-world-api
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hello-world-api
+  template:
+    spec:
+      containers:
+      - name: hello-world-api
+        image: k3d-hello-world-api.registry.localhost:12345/ahmedalhulaibi/hello-world-api:latest
+        securityContext:
+          capabilities:
+            add:
+              - SYS_PTRACE
+        ports:
+        - containerPort: 8080
+        - containerPort: 8090
+        - containerPort: 2345
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-world-api-svc
+spec:
+  type: ClusterIP
+  ports:
+  - name: debug
+    targetPort: 2345
+    port: 2345
+    protocol: TCP
+  selector:
+    app: hello-world-api

@@ -1,0 +1,7 @@
+mirrors:
+  "ghcr.io":
+    endpoint:
+      - https://ghcr.io
+  "localhost:12345":
+    endpoint:
+      - http://k3d-hello-world-api.registry.localhost:12345 

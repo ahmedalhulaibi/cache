@@ -1,0 +1,26 @@
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: web-ingress
+  namespace: linkerd-viz
+spec:
+  entryPoints:
+    - web
+  routes:
+  - match: Host(`viz.127.0.0.1.nip.io`)
+    kind: Rule
+    services:
+    - name: web
+      port: 8084
+    middlewares:
+    - name: web-http-l5d-dst-override
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: web-http-l5d-dst-override
+  namespace: linkerd-viz
+spec:
+  headers:
+    customRequestHeaders:
+      l5d-dst-override: "web.linkerd-viz.svc.cluster.local:8084"

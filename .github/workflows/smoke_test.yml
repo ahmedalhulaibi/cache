@@ -1,0 +1,56 @@
+name: Smoke Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - 
+        name: Checkout
+        uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }} # using GITHUB_TOKEN as auth for this repo
+      - 
+        name: Setup SSH Keys and known_hosts
+        id: ssh-setup
+        if: success()
+        env:
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
+          SSH_KEY: ${{ secrets.ssh_key }}
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          echo "$SSH_KEY" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-add ~/.ssh/id_rsa
+          echo "::set-output name=SSH_AUTH_SOCK::$SSH_AUTH_SOCK"
+          echo "::set-output name=SSH_KEY_PATH::$HOME/.ssh/id_rsa"
+      - 
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+        if: success()
+      - 
+        name: Setup build cache
+        uses: actions/cache@v2
+        if: success()
+        with:
+          path: /tmp/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ hashFiles('./go/Dockerfile') }}
+      - 
+        name: Set up k3d cluster
+        run: make bootstrap
+      -
+        name: Start services
+        run: make run
+        env:
+          SSH_AUTH_SOCK: ${{ steps.ssh-setup.outputs.SSH_AUTH_SOCK }}
+      -
+        name: Run Smoke Tests
+        run: K6_HTTP_BASE_URL="http://localhost:8888/hello-world-api" make smoke-test
