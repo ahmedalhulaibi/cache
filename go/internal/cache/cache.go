@@ -83,7 +83,7 @@ func WithEvictionPolicy(policy EvictionPolicy) Option {
 }
 
 // for testing purposes
-func withClock(clock func() time.Time) Option {
+func WithClock(clock func() time.Time) Option {
 	return func(o *Options) error {
 		o.clock = clock
 		return nil
@@ -153,10 +153,10 @@ type cache interface {
 
 func newCache(capacity int) *cacheImplementation {
 	return &cacheImplementation{
-		recentlyUsed: list.New(),
-		// age:          list.New(),
-		keys:     make(map[string]*list.Element, capacity),
-		capacity: capacity,
+		ruList:     list.New(),
+		ruIndex:    make(map[string]*list.Element, capacity),
+		oldestList: list.New(),
+		capacity:   capacity,
 	}
 }
 
@@ -166,11 +166,14 @@ type record struct {
 	expiry *time.Time
 }
 
+/*
+map[key]->oldestList->ruList->record
+*/
 type cacheImplementation struct {
-	recentlyUsed *list.List // doubly linked list, front is most recently used
-	// age          *list.List // doubly linked list, front is oldest
-	keys     map[string]*list.Element
-	capacity int
+	ruList     *list.List // doubly linked list, front is most recently used
+	ruIndex    map[string]*list.Element
+	oldestList *list.List // doubly linked list, front is oldest
+	capacity   int
 	sync.RWMutex
 }
 
@@ -178,7 +181,7 @@ func (c *cacheImplementation) Set(key string, value []byte, opts *Options) error
 	c.Lock()
 	defer c.Unlock()
 
-	if c.recentlyUsed.Len() >= c.capacity {
+	if c.ruList.Len() >= c.capacity {
 		if err := c.evict(opts.evictionPolicy); err != nil {
 			return err
 		}
@@ -196,20 +199,26 @@ func (c *cacheImplementation) Set(key string, value []byte, opts *Options) error
 		expiry: expiry,
 	}
 
-	elem, ok := c.keys[key]
+	oe, ok := c.ruIndex[key]
 	if ok {
-		c.recentlyUsed.MoveToFront(elem)
-		// the old record is replaced with the new one, old one will be garbage collected
-		elem.Value = r
+		elem, ok := oe.Value.(*list.Element)
+		if ok {
+			c.ruList.MoveToFront(elem)
+			// the old record is replaced with the new one, old one will be garbage collected
+			elem.Value = r
+			return nil
+		}
+	}
+
+	if c.ruList.Len() == 0 {
+		c.ruIndex[key] = c.oldestList.PushFront(c.ruList.PushFront(r))
 		return nil
 	}
 
-	if c.recentlyUsed.Len() == 0 {
-		c.keys[key] = c.recentlyUsed.PushFront(r)
-		return nil
-	}
-
-	c.keys[key] = c.recentlyUsed.InsertBefore(r, c.recentlyUsed.Front())
+	c.ruIndex[key] = c.oldestList.InsertBefore(
+		c.ruList.InsertBefore(r, c.ruList.Front()),
+		c.oldestList.Front(),
+	)
 
 	return nil
 }
@@ -218,24 +227,24 @@ func (c *cacheImplementation) Get(key string, opts *Options) ([]byte, error) {
 	c.Lock()
 	defer c.Unlock()
 
-	elem, ok := c.keys[key]
+	elem, ok := c.ruIndex[key]
 	if !ok {
 		return nil, nil
 	}
 
-	if elem.Value.(*record).expiry != nil && opts.clock().After(*elem.Value.(*record).expiry) {
-		c.recentlyUsed.Remove(elem)
-		delete(c.keys, key)
+	record := elem.Value.(*list.Element).Value.(*record)
+
+	if record.expiry != nil && opts.clock().After(*record.expiry) {
+		c.remove(elem)
 		return nil, nil
 	}
 
-	record := elem.Value.(*record)
-	if opts.evictOnGet && c.recentlyUsed.Len() >= c.capacity {
+	if opts.evictOnGet && c.ruList.Len() >= c.capacity {
 		if err := c.evict(EvictOldest); err != nil {
 			return nil, err
 		}
 	} else {
-		c.recentlyUsed.MoveToFront(elem)
+		c.ruList.MoveToFront(elem.Value.(*list.Element))
 	}
 
 	return record.value, nil
@@ -245,14 +254,19 @@ func (c *cacheImplementation) Delete(key string, opts *Options) error {
 	c.Lock()
 	defer c.Unlock()
 
-	elem, ok := c.keys[key]
+	elem, ok := c.ruIndex[key]
 	if !ok {
 		return nil
 	}
 
-	c.recentlyUsed.Remove(elem)
-	delete(c.keys, key)
+	c.remove(elem)
 	return nil
+}
+
+func (c *cacheImplementation) remove(e *list.Element) {
+	c.oldestList.Remove(e)
+	r := c.ruList.Remove(e.Value.(*list.Element)).(*record)
+	delete(c.ruIndex, r.key)
 }
 
 func (c *cacheImplementation) evict(e EvictionPolicy) error {
@@ -265,8 +279,7 @@ func (c *cacheImplementation) evict(e EvictionPolicy) error {
 		return nil
 	}
 
-	c.recentlyUsed.Remove(elem)
-	delete(c.keys, elem.Value.(*record).key)
+	c.remove(elem)
 	return nil
 }
 
@@ -288,19 +301,25 @@ func (c *cacheImplementation) getEvictionCandidate(e EvictionPolicy) (*list.Elem
 }
 
 func (c *cacheImplementation) getLru() (*list.Element, error) {
-	return c.recentlyUsed.Back(), nil
+	r, ok := c.ruList.Back().Value.(*record)
+	if !ok {
+		return nil, fmt.Errorf("error getting LRU element")
+	}
+	return c.ruIndex[r.key], nil
 }
 
 func (c *cacheImplementation) getMru() (*list.Element, error) {
-	return c.recentlyUsed.Front(), nil
+	r, ok := c.ruList.Front().Value.(*record)
+	if !ok {
+		return nil, fmt.Errorf("error getting MRU element")
+	}
+	return c.ruIndex[r.key], nil
 }
 
 func (c *cacheImplementation) getOldest() (*list.Element, error) {
-	// TODO: implement
-	return nil, fmt.Errorf("not implemented")
+	return c.oldestList.Front(), nil
 }
 
 func (c *cacheImplementation) getNewest() (*list.Element, error) {
-	// TODO: implement
-	return nil, fmt.Errorf("not implemented")
+	return c.oldestList.Back(), nil
 }

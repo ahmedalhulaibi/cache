@@ -24,6 +24,9 @@ func TestCacheImplementationGet(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Equal(t, []byte("user1"), record)
+
+	// size of cache should be 1
+	require.Equal(t, 1, len(c.ruIndex))
 }
 
 func TestLruEviction(t *testing.T) {
@@ -42,6 +45,8 @@ func TestLruEviction(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
+
+	require.Equal(t, 1, len(c.ruIndex))
 }
 
 func TestLruEvictionIncreasedCapacity(t *testing.T) {
@@ -59,6 +64,8 @@ func TestLruEvictionIncreasedCapacity(t *testing.T) {
 	record, err = c.Get("user:2", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
+
+	require.Equal(t, 2, len(c.ruIndex))
 }
 
 func TestMruEviction(t *testing.T) {
@@ -76,6 +83,7 @@ func TestMruEviction(t *testing.T) {
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
+	require.Equal(t, 2, len(c.ruIndex))
 }
 
 func TestTtlExpiry(t *testing.T) {
@@ -98,6 +106,25 @@ func TestTtlExpiry(t *testing.T) {
 	defaultOpts.clock = func() time.Time {
 		return now.Add(2 * time.Second)
 	}
+	record, err = c.Get("user:1", defaultOpts)
+	require.NoError(t, err)
+	require.Nil(t, record)
+	require.Equal(t, 0, len(c.ruIndex))
+}
+
+func TestOldestEviction(t *testing.T) {
+	c := newCache(1)
+	defaultOpts, _ := getOptions()
+	defaultOpts.evictOnGet = false
+	defaultOpts.evictionPolicy = EvictOldest
+
+	require.NoError(t, c.Set("user:1", []byte("user1"), defaultOpts))
+	record, err := c.Get("user:1", defaultOpts)
+	require.NoError(t, err)
+	require.Equal(t, []byte("user1"), record)
+
+	require.NoError(t, c.Set("user:2", []byte("user2"), defaultOpts))
+	// This record will be evicted since evictOnGet is false
 	record, err = c.Get("user:1", defaultOpts)
 	require.NoError(t, err)
 	require.Nil(t, record)
